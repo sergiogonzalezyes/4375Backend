@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from server.db import engine
 from sqlalchemy.orm import sessionmaker
-from server.classes import User
+from server.classes import User, Service, Barber_Service
 from flask_bcrypt import Bcrypt
 
 
@@ -149,6 +149,26 @@ def register():
     finally:
         # Ensure the session is closed
         session.close()
+
+
+@app.route("/services/<int:barber_id>", methods=["GET"])
+def get_barber_services(barber_id):
+    try:
+        # Query the database to get the list of services offered by the specific barber
+        services = (
+            Service.query
+            .join(Barber_Service)  # Assuming you have a relationship defined in your models
+            .filter(Barber_Service.Barber_User_ID == barber_id)
+            .all()
+        )
+
+        # Convert the services to a list of dictionaries
+        services_list = [service.to_dict() for service in services]
+        return jsonify({"services": services_list})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
 
 
