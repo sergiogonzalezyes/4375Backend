@@ -39,16 +39,21 @@ class Appointment(Base):
     __tablename__ = 'Appointment'
 
     Appointment_ID = Column(Integer, primary_key=True, autoincrement=True)
+    F_Name = Column(String(15), nullable=False)
+    L_Name = Column(String(15), nullable=False)
+    Email = Column(String(25), unique=True, nullable=False)
+    Phone_Number = Column(String(10), unique=True, nullable=False)
     Customer_User_ID = Column(Integer, ForeignKey('User.User_ID'), nullable=False)
     Barber_User_ID = Column(Integer, ForeignKey('User.User_ID'), nullable=False)
     Appointment_Date_Time = Column(DateTime, nullable=False)
     Status = Column(String(10), nullable=False)
     Payment_ID = Column(Integer, ForeignKey('Payment.Payment_ID'))
+    Service_ID = Column(Integer, ForeignKey('Service.Service_ID'))
 
     reviews = relationship('Review', backref='appointment')
     notifications = relationship('Notification', backref='appointment')
-    appointment_services = relationship('Appointment_Service', backref='appointment')
     customer_histories = relationship('Customer_History', backref='appointment')
+
 
 
 class Service(Base):
@@ -59,9 +64,7 @@ class Service(Base):
     Service_Description = Column(String(200), unique=True, nullable=False)
     Service_Price = Column(Numeric(precision=10, scale=2), nullable=False)
     Service_Duration = Column(String(15), nullable=False)
-
-    appointment_services = relationship('Appointment_Service', backref='service')
-
+    
 
 class Notification(Base):
     __tablename__ = 'Notification'
@@ -71,8 +74,8 @@ class Notification(Base):
     Appointment_ID = Column(Integer, ForeignKey('Appointment.Appointment_ID'), nullable=False)
     Message = Column(String(255), nullable=False)
     Notification_Type = Column(String(15), nullable=False)
-    Date_Time = Column(DateTime, nullable=False)
-    Status = Column(String(15), nullable=False)
+    Notification_Date_Time = Column(DateTime, nullable=False)
+    Notification_Status = Column(String(15), nullable=False)
 
 
 class Payment(Base):
@@ -93,14 +96,6 @@ class Review(Base):
     Rating = Column(Integer, nullable=False)
     Comment = Column(String(255), nullable=True)
     Appointment_ID = Column(Integer, ForeignKey('Appointment.Appointment_ID'), nullable=False)
-
-
-class Appointment_Service(Base):
-    __tablename__ = 'Appointment_Service'
-
-    Appointment_Service_ID = Column(Integer, primary_key=True, autoincrement=True)
-    Appointment_ID = Column(Integer, ForeignKey('Appointment.Appointment_ID'), nullable=False)
-    Service_ID = Column(Integer, ForeignKey('Service.Service_ID'), nullable=False)
 
 
 class Customer_History(Base):

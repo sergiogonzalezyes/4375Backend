@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from server.db import engine
 from sqlalchemy.orm import sessionmaker
-from server.classes import User, Service, Barber_Service, Schedule
+from server.classes import User, Service, Barber_Service, Schedule, Appointment, Notification
 from flask_bcrypt import Bcrypt
 from datetime import datetime, timedelta
 
@@ -370,16 +370,280 @@ def get_available_time_slots_for_barber(barber_id):
 
         # Return the time_slots_dict as JSON
         return jsonify({'available_time_slots': time_slots_dict})
-
     except Exception as e:
         # Close the session in case of an exception
         if 'session' in locals():
             session.close()
         return jsonify({'error': str(e)}), 500
+    
+
+
+from sqlalchemy import update
+
+@app.route('/bookings', methods=['POST'])
+def create_booking():
+    # Get data from the request's JSON body
+    data = request.get_json()
+    # print('data\n', data)
+
+    # print('\n')
+
+    # Extract data from the request
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    email = data.get('email')
+    phone = data.get('phone')
+    barber_id = data.get('barber_id')
+    date_str = data.get('date')
+    start_time_str = data.get('start_time')
+    end_time_str = data.get('end_time')
+    service = data.get('service_id')
+
+    # Convert date and times to the desired format
+    date_obj = datetime.strptime(date_str, '%a, %d %b %Y %H:%M:%S %Z')
+    date_formatted = date_obj.strftime('%Y-%m-%d')
+    start_time_formatted = start_time_str + ':00'  # Add seconds to start_time if needed
+    appointment_date_time_str = f"{date_formatted} {start_time_formatted}"
+    appointment_date_time = datetime.strptime(appointment_date_time_str, '%Y-%m-%d %H:%M:%S')
+
+
+    try:
+        session = Session()
+        
+        # Check if there is a User_ID (Customer_User_ID) associated with the email
+        customer_user_id = session.query(User.User_ID).filter_by(Email=email).first()
+        # Check if there is a User_ID (Customer_User_ID) associated with the email
+        customer_user = session.query(User).filter_by(Email=email).first()
+
+        if customer_user:
+            customer_user_id = customer_user.User_ID
+            # print('customer_user_id', customer_user_id)
+            # User is authenticated, use their data
+            appointment = Appointment(
+                Customer_User_ID=customer_user_id,
+                Barber_User_ID=barber_id,
+                Appointment_Date_Time=appointment_date_time,
+                Status='Confirmed',  # Set an appropriate status
+                Service_ID=service
+            )
+                        # Create a notification
+
+        else:
+            # User is not authenticated, use data from the request
+            appointment = Appointment(
+                F_Name=first_name,
+                L_Name=last_name,
+                Email=email,
+                Phone_Number=phone,
+                Barber_User_ID=barber_id,
+                Appointment_Date_Time=appointment_date_time,
+                Status='Confirmed',  # Set an appropriate status
+                Service_ID=service
+            )
+            # print('appointment', appointment)
+
+
+        session.add(appointment)
+        # Create a notification
+        # to create a notificaiton we need the id of the appoinment that was created above
+        # we can get the id of the appointment by querying the appointment table
+
+        appointment_id = session.query(Appointment.Appointment_ID).filter_by(
+            Customer_User_ID=customer_user_id,
+            Barber_User_ID=barber_id,
+            Appointment_Date_Time=appointment_date_time,
+            Status='Confirmed',  # Set an appropriate status
+            Service_ID=service
+        ).first()
+
+        print('appointment_id', appointment_id[0])
+
+        notification = Notification(
+            User_ID=barber_id,
+            Appointment_ID=appointment_id[0],  # Assuming Appointment_ID is generated on insert
+            Message='Your appointment has been booked.',
+            Notification_Type= 'Booking Confirmation',
+            Notification_Date_Time=datetime.now(),
+            Notification_Status='Unread'
+        )
+        # print('appointment', appointment)
+        print('notification', notification)
+        # Add both appointment and notification to the session
+        # session.add(appointment)
+        session.add(notification)
+        # Commit the appointment to the database
+
+        
+        # Now, update the associated schedule record
+        # day_of_week = date_obj.strftime('%A')  # Get the full day name (e.g., 'Monday', 'Tuesday')
+        start_time_formatted = start_time_str + ':00'  # Format start_time
+        end_time_formatted = end_time_str + ':00'  # Format end_time
+        schedule_record = session.query(Schedule).filter_by(
+            Barber_User_ID=barber_id,
+            Day_Of_Week=date_formatted,
+            Start_Time=f'{date_formatted} {start_time_formatted}',
+            End_Time=f'{date_formatted} {end_time_formatted}'
+        ).first()
+        
+        if schedule_record:
+            schedule_record.Status = 'Unavailable'
+        
+        session.commit()
+        session.close()
+
+        # Return a success response
+        return jsonify({'message': 'Appointment created successfully'}), 201
+
+    except Exception as e:
+        print('Error:', str(e))
+        return jsonify({'error': str(e)}), 500
 
 
 
+@app.route('/notifications/<int:user_id>', methods=['GET'])
+def get_notifications(user_id):
+    try:
+        session = Session()
 
+        # Query the User table to find the user by User_ID
+        user = session.query(User).filter_by(User_ID=user_id).first()
+        print('user', user)
+
+        if user:
+            # Query the Notification table to fetch notifications for the user
+            notifications = session.query(Notification).filter_by(User_ID=user_id).all()
+            print('notifications', notifications)
+            for notification in notifications:
+                print(notification.Notification_Date_Time.strftime('%Y-%m-%d %H:%M:%S'))
+
+
+
+            # Convert notifications to a list of dictionaries with desired fields
+            formatted_notifications = []
+            for notification in notifications:
+                formatted_notification = {
+                    'id': notification.Notification_ID,
+                    'appointment_id': notification.Appointment_ID,
+                    'title': notification.Notification_Type,
+                    'content': notification.Message,
+                    'created_at': notification.Notification_Date_Time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'status': notification.Notification_Status
+                }
+                formatted_notifications.append(formatted_notification)
+            
+            return jsonify({'notifications': formatted_notifications}), 200
+
+        else:
+            return jsonify({'message': 'User not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+# Define a route to mark a notification as read
+@app.route('/mark-as-read/<int:notification_id>', methods=['PUT'])
+def mark_as_read(notification_id):
+    try:
+        session = Session()
+
+        # Query the Notification table to find the notification by ID
+        notification = session.query(Notification).filter_by(Notification_ID=notification_id).first()
+
+        if notification:
+            # Update the notification status to "Read"
+            notification.Notification_Status = 'Read'
+            session.commit()
+            return jsonify({'message': 'Notification marked as read.'}), 200
+        else:
+            return jsonify({'message': 'Notification not found.'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/mark-all-as-read', methods=['PUT'])
+def mark_all_notifications_as_read():
+    try:
+        data = request.get_json()
+        notification_ids = data.get('notificationIds', [])
+
+        session = Session()
+
+        # Update the status of all notifications with the given IDs to 'Read'
+        session.query(Notification).filter(Notification.Notification_ID.in_(notification_ids)).update(
+            {"Notification_Status": "Read"},
+            synchronize_session=False
+        )
+
+        session.commit()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+        
+
+@app.route('/appointments/<int:appointment_id>', methods=['GET'])
+def get_appointment_details(appointment_id):
+    try:
+        # Create a new session
+        session = Session()
+
+        # Query the Appointment table by appointment_id
+        appointment = session.query(Appointment).filter_by(Appointment_ID=appointment_id).first()
+
+        # Check if the appointment exists
+        if appointment is not None:
+            # Convert the appointment object to a dictionary for JSON serialization
+            appointment_details = {
+                'Appointment_ID': appointment.Appointment_ID,
+                'Appointment_Date_Time': appointment.Appointment_Date_Time.strftime('%Y-%m-%d %H:%M:%S'),
+                'Status': appointment.Status,
+                'Payment_ID': appointment.Payment_ID,
+                'Service_ID': appointment.Service_ID,
+                'Barber_User_ID': appointment.Barber_User_ID,
+                'Customer_User_ID': appointment.Customer_User_ID,
+                'F_Name': appointment.F_Name,
+                'L_Name': appointment.L_Name,
+                'Email': appointment.Email,
+                'Phone_Number': appointment.Phone_Number,
+            }
+
+            # Check if the appointment is associated with a logged-in user
+            if appointment.Customer_User_ID is not None:
+                # Query the User table to get user details
+                user = session.query(User).filter_by(User_ID=appointment.Customer_User_ID).first()
+                if user is not None:
+                    appointment_details['F_Name'] = user.F_Name
+                    appointment_details['L_Name'] = user.L_Name
+                    appointment_details['Email'] = user.Email
+                    appointment_details['Phone_Number'] = user.Phone_Number
+
+            # Query the Service table to get service details
+            service = session.query(Service).filter_by(Service_ID=appointment.Service_ID).first()
+            if service is not None:
+                appointment_details['Service_Name'] = service.Service_Name
+                appointment_details['Service_Description'] = service.Service_Description
+                appointment_details['Service_Price'] = service.Service_Price
+
+            return jsonify(appointment_details)
+        else:
+            # If the appointment doesn't exist, return a 404 error
+            return jsonify({'error': 'Appointment not found'}), 404
+    except Exception as e:
+        # Handle exceptions (e.g., database errors)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        # Close the session
+        session.close()
+
+        
+
+if __name__ == '__main__':
+    app.run(debug=True)
 
 
 

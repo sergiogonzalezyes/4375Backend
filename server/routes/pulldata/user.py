@@ -1,34 +1,34 @@
-from server import app
-from server.classes import User, Schedule, Appointment, Service, Notification, Payment, Review, Appointment_Service, Customer_History, Holiday, Blacklist, Barber_Service
-import pandas as pd
-from server.db import engine
-from sqlalchemy.orm import sessionmaker
+# from server import app
+# from server.classes import User, Schedule, Appointment, Service, Notification, Payment, Review, Appointment_Service, Customer_History, Holiday, Blacklist, Barber_Service
+# import pandas as pd
+# from server.db import engine
+# from sqlalchemy.orm import sessionmaker
 
 
 
-Session = sessionmaker(bind=engine)
+# Session = sessionmaker(bind=engine)
 
 
 
-@app.route("/")
-def home():
-    return "Hello, World!"
+# @app.route("/")
+# def home():
+#     return "Hello, World!"
     
 
-@app.route("/dashboard")
-def api():
-    return "Hello from localhost 5000!"
+# @app.route("/dashboard")
+# def api():
+#     return "Hello from localhost 5000!"
 
-from flask import jsonify
+# from flask import jsonify
 
-@app.route("/user")
-def user():
-    session = Session()  # Create a new session
-    cars = session.query(User).statement
-    df = pd.read_sql(cars, session.bind)
-    print('look here', df)
-    session.close()
-    return jsonify(df.to_dict(orient='records'))
+# @app.route("/user")
+# def user():
+#     session = Session()  # Create a new session
+#     cars = session.query(User).statement
+#     df = pd.read_sql(cars, session.bind)
+#     print('look here', df)
+#     session.close()
+#     return jsonify(df.to_dict(orient='records'))
 
 
 # @app.route('/login', methods=['POST'])

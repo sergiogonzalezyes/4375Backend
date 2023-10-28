@@ -11,5 +11,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:8080"}})
 
 
-from server.routes.pulldata.user import user
+from server.classes import User, Schedule, Appointment, Service, Notification, Payment, Review, Customer_History, Holiday, Blacklist, Barber_Service
+
 
