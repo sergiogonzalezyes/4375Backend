@@ -378,15 +378,10 @@ def get_available_time_slots_for_barber(barber_id):
     
 
 
-from sqlalchemy import update
-
 @app.route('/bookings', methods=['POST'])
 def create_booking():
     # Get data from the request's JSON body
     data = request.get_json()
-    # print('data\n', data)
-
-    # print('\n')
 
     # Extract data from the request
     first_name = data.get('first_name')
@@ -398,97 +393,72 @@ def create_booking():
     start_time_str = data.get('start_time')
     end_time_str = data.get('end_time')
     service = data.get('service_id')
+    customer_id = data.get('customer_id')
+    print('customer_id', customer_id)
 
     # Convert date and times to the desired format
     date_obj = datetime.strptime(date_str, '%a, %d %b %Y %H:%M:%S %Z')
     date_formatted = date_obj.strftime('%Y-%m-%d')
     start_time_formatted = start_time_str + ':00'  # Add seconds to start_time if needed
-    appointment_date_time_str = f"{date_formatted} {start_time_formatted}"
-    appointment_date_time = datetime.strptime(appointment_date_time_str, '%Y-%m-%d %H:%M:%S')
-
+    end_time_formatted = end_time_str + ':00'
+    start_datetime_str = f"{date_formatted} {start_time_formatted}"
+    start_datetime = datetime.strptime(start_datetime_str, '%Y-%m-%d %H:%M:%S')
+    end_datetime_str = f"{date_formatted} {end_time_formatted}"
+    end_datetime = datetime.strptime(end_datetime_str, '%Y-%m-%d %H:%M:%S')
 
     try:
         session = Session()
-        
-        # Check if there is a User_ID (Customer_User_ID) associated with the email
-        customer_user_id = session.query(User.User_ID).filter_by(Email=email).first()
-        # Check if there is a User_ID (Customer_User_ID) associated with the email
-        customer_user = session.query(User).filter_by(Email=email).first()
 
-        if customer_user:
-            customer_user_id = customer_user.User_ID
-            # print('customer_user_id', customer_user_id)
-            # User is authenticated, use their data
-            appointment = Appointment(
-                Customer_User_ID=customer_user_id,
-                Barber_User_ID=barber_id,
-                Appointment_Date_Time=appointment_date_time,
-                Status='Confirmed',  # Set an appropriate status
-                Service_ID=service
-            )
-                        # Create a notification
+        # Determine the selected schedule for the time slot
+        selected_schedule = session.query(Schedule).filter_by(
+            Barber_User_ID=barber_id,
+            Day_Of_Week=date_formatted,
+            Start_Time=start_datetime.strftime('%Y-%m-%d %H:%M:%S'),  # Format start_datetime
+            End_Time=end_datetime.strftime('%Y-%m-%d %H:%M:%S'),  # Format end_datetime
+        ).first()
 
-        else:
-            # User is not authenticated, use data from the request
+        if selected_schedule:
+            # User is authenticated or not, use data from the request
             appointment = Appointment(
                 F_Name=first_name,
                 L_Name=last_name,
                 Email=email,
                 Phone_Number=phone,
+                Customer_User_ID=customer_id,
                 Barber_User_ID=barber_id,
-                Appointment_Date_Time=appointment_date_time,
+                Appointment_Date_Time=start_datetime,  # Use start_datetime as the appointment time
+                Appointment_End_Date_Time=end_datetime,
                 Status='Confirmed',  # Set an appropriate status
-                Service_ID=service
+                Service_ID=service,
+                Schedule_ID=selected_schedule.Schedule_ID  # Assign the Schedule_ID from the selected schedule
             )
-            # print('appointment', appointment)
 
+            session.add(appointment)
+            session.commit()  # Commit the appointment to the database to obtain the Appointment_ID
 
-        session.add(appointment)
-        # Create a notification
-        # to create a notificaiton we need the id of the appoinment that was created above
-        # we can get the id of the appointment by querying the appointment table
+            # Create a notification
+            appointment_id = appointment.Appointment_ID  # Get the appointment ID
+            notification = Notification(
+                User_ID=barber_id,
+                Appointment_ID=appointment_id,
+                Message='Your appointment has been booked.',
+                Notification_Type='Booking Confirmation',
+                Notification_Date_Time=datetime.now(),
+                Notification_Status='Unread'
+            )
 
-        appointment_id = session.query(Appointment.Appointment_ID).filter_by(
-            Customer_User_ID=customer_user_id,
-            Barber_User_ID=barber_id,
-            Appointment_Date_Time=appointment_date_time,
-            Status='Confirmed',  # Set an appropriate status
-            Service_ID=service
-        ).first()
+            session.add(notification)
 
-        print('appointment_id', appointment_id[0])
+            # Update the schedule status
+            selected_schedule.Status = 'Unavailable'
 
-        notification = Notification(
-            User_ID=barber_id,
-            Appointment_ID=appointment_id[0],  # Assuming Appointment_ID is generated on insert
-            Message='Your appointment has been booked.',
-            Notification_Type= 'Booking Confirmation',
-            Notification_Date_Time=datetime.now(),
-            Notification_Status='Unread'
-        )
-        # print('appointment', appointment)
-        print('notification', notification)
-        # Add both appointment and notification to the session
-        # session.add(appointment)
-        session.add(notification)
-        # Commit the appointment to the database
+            session.commit()  # Commit the notification and schedule changes
 
-        
-        # Now, update the associated schedule record
-        # day_of_week = date_obj.strftime('%A')  # Get the full day name (e.g., 'Monday', 'Tuesday')
-        start_time_formatted = start_time_str + ':00'  # Format start_time
-        end_time_formatted = end_time_str + ':00'  # Format end_time
-        schedule_record = session.query(Schedule).filter_by(
-            Barber_User_ID=barber_id,
-            Day_Of_Week=date_formatted,
-            Start_Time=f'{date_formatted} {start_time_formatted}',
-            End_Time=f'{date_formatted} {end_time_formatted}'
-        ).first()
-        
-        if schedule_record:
-            schedule_record.Status = 'Unavailable'
-        
-        session.commit()
+        else:
+            # Handle the case when the selected schedule is None, indicating an error
+            print('Selected schedule not found')
+            return jsonify({'error': 'Selected schedule not found'}), 400
+
         session.close()
 
         # Return a success response
@@ -497,6 +467,10 @@ def create_booking():
     except Exception as e:
         print('Error:', str(e))
         return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
 
 
 
@@ -601,6 +575,7 @@ def get_appointment_details(appointment_id):
             appointment_details = {
                 'Appointment_ID': appointment.Appointment_ID,
                 'Appointment_Date_Time': appointment.Appointment_Date_Time.strftime('%Y-%m-%d %H:%M:%S'),
+                'Appointment_End_Date_Time': appointment.Appointment_End_Date_Time.strftime('%Y-%m-%d %H:%M:%S'),
                 'Status': appointment.Status,
                 'Payment_ID': appointment.Payment_ID,
                 'Service_ID': appointment.Service_ID,
@@ -640,11 +615,77 @@ def get_appointment_details(appointment_id):
         # Close the session
         session.close()
 
+
         
 
-if __name__ == '__main__':
-    app.run(debug=True)
+@app.route('/appointmentsforbarber/<int:user_id>', methods=['GET'])
+def get_appointments_for_barber(user_id):
+    try:
+        session = Session()
 
+        # Query the Appointment table to find appointments for the user
+        appointments = session.query(Appointment).filter_by(Barber_User_ID=user_id).all()
+        print('appointments', appointments)
+
+        # Convert appointments to a list of dictionaries with desired fields
+        formatted_appointments = []
+        for appointment in appointments:
+            # Get the service associated with the appointment
+            service = session.query(Service).filter_by(Service_ID=appointment.Service_ID).first()
+
+            # Get the schedule information associated with the appointment
+            schedule = session.query(Schedule).filter_by(Schedule_ID=appointment.Schedule_ID).first()
+
+            # Initialize customer details
+            customer_details = {
+                'customer_user_id': appointment.Customer_User_ID,
+                'email': None,
+                'first_name': None,
+                'last_name': None,
+                'phone_number': None
+            }
+            print('customerdetails\n', customer_details)
+
+            # Check if customer_user_id is not None and retrieve customer details if available
+            if appointment.Customer_User_ID:
+                customer = session.query(User).filter_by(User_ID=appointment.Customer_User_ID).first()
+                if customer:
+                    customer_details['email'] = customer.Email
+                    customer_details['first_name'] = customer.F_Name
+                    customer_details['last_name'] = customer.L_Name
+                    customer_details['phone_number'] = customer.Phone_Number
+            else:
+                customer_details['email'] = appointment.Email
+                customer_details['first_name'] = appointment.F_Name
+                customer_details['last_name'] = appointment.L_Name
+                customer_details['phone_number'] = appointment.Phone_Number
+            
+
+            if service and schedule:
+                formatted_appointment = {
+                    'id': appointment.Appointment_ID,
+                    'appointment_date_time': appointment.Appointment_Date_Time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'appointment_end_date_time': appointment.Appointment_End_Date_Time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'status': appointment.Status,
+                    'customer': customer_details,
+                    'service': {
+                        'service_id': service.Service_ID,
+                        'service_name': service.Service_Name,  # Use service name as 'name'
+                        'service_description': service.Service_Description,
+                        'service_price': service.Service_Price,
+                        'service_duration': service.Service_Duration
+                    },
+                    'start_time': schedule.Start_Time.strftime('%H:%M:%S'),
+                    'end_time': schedule.End_Time.strftime('%H:%M:%S')
+                }
+                formatted_appointments.append(formatted_appointment)
+                print(formatted_appointments)
+
+        return jsonify({'appointments': formatted_appointments}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
 
 
 
@@ -675,6 +716,27 @@ if __name__ == '__main__':
 #         print(f"An error occurred: {str(e)}")
 #     finally:
 #         # Ensure the session is closed
+#         session.close()
+
+# @app.route('/update_schedule_status', methods=['POST'])
+# def update_schedule_status():
+#     session = Session()
+#     try:
+#         # Query and update all schedule records to set Status to 'Available'
+#         schedule_records = session.query(Schedule).all()
+#         for schedule_record in schedule_records:
+#             schedule_record.Status = 'Available'
+
+#         # Commit the changes to the database
+#         session.commit()
+#         return jsonify({'message': 'Status of all schedule records updated to "Available"'}), 200
+
+#     except Exception as e:
+#         # Handle exceptions if any
+#         session.rollback()
+#         return jsonify({'error': str(e)}), 500
+
+#     finally:
 #         session.close()
 
 

@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric, Float
 from sqlalchemy.orm import relationship
 from .db import Base, engine
+from datetime import datetime
 
 
 class User(Base):
@@ -46,13 +47,16 @@ class Appointment(Base):
     Customer_User_ID = Column(Integer, ForeignKey('User.User_ID'), nullable=False)
     Barber_User_ID = Column(Integer, ForeignKey('User.User_ID'), nullable=False)
     Appointment_Date_Time = Column(DateTime, nullable=False)
+    Appointment_End_Date_Time = Column(DateTime, nullable=False)
     Status = Column(String(10), nullable=False)
     Payment_ID = Column(Integer, ForeignKey('Payment.Payment_ID'))
     Service_ID = Column(Integer, ForeignKey('Service.Service_ID'))
+    Schedule_ID = Column(Integer, ForeignKey('Schedule.Schedule_ID'))
 
     reviews = relationship('Review', backref='appointment')
     notifications = relationship('Notification', backref='appointment')
     customer_histories = relationship('Customer_History', backref='appointment')
+    appointment_schedule = relationship('Schedule', backref='appointment')
 
 
 
