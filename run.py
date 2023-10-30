@@ -69,7 +69,7 @@ def update_profile():
     # Your update profile logic here
     try:
         data = request.json
-        print(data)
+        # print(data)
         username = data.get('username')
         
         # Create a session instance
@@ -181,66 +181,90 @@ def get_all_services():
 
         # Close the session
         session.close()
-        print(services_list)
+        # print(services_list)
         # Return the list of service data as JSON
         return jsonify({"services": services_list})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
 
+@app.route('/updateservice/<int:service_id>', methods=['PUT'])
+def update_service(service_id):
+    try:
+        session = Session()
+        data = request.get_json()
+        print('data', data)
+        service_id = data.get('Service_ID')
+        new_service_name = data.get('Service_Name')
+        new_service_description = data.get('Service_Description')
+        new_service_price = data.get('Service_Price')
+        new_service_duration = data.get('Service_Duration')
+        
+
+        # Query the database to find the service by ID
+        service = session.query(Service).filter_by(Service_ID=service_id).first()
+
+        if service:
+            # change the old data with the new data
+            service.Service_Name = new_service_name
+            service.Service_Description = new_service_description
+            service.Service_Price = new_service_price
+            service.Service_Duration = new_service_duration
+
+            # Commit changes to the database
+            session.commit()
+
+            return jsonify({"success": True, "message": "Service updated successfully"})
+        else:
+            return jsonify({"success": False, "message": "Service not found"}), 404
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 
-# @app.route('/service/<int:service_id>/availability', methods=['GET'])
-# def get_service_availability(service_id):
-#     try:
-#         # Create a sessions # Replace 'your_database_engine' with your actual database engine
-#         session = Session()
 
-#         # Find the service
-#         service = Service.query.get(service_id)
+@app.route('/weeklyappointments/<int:user_id>', methods=['GET'])
+def fetchWeeklyAppointments(user_id):
+    try:
+        session = Session()
+        user_id = request.args.get('user_id')
+        print('user_id', user_id)
+        # Query the database to find the service by ID
+        appointments = session.query(Appointment).filter_by(Barber_User_ID=user_id).all()
+        print('appointments', appointments)
+        # Create a list to store the service data
+        appointments_list = []
+        # Iterate over the services and convert them to dictionaries
+        for appointment in appointments:
+            appointment_data = {
+                "Appointment_ID": appointment.Appointment_ID,
+                "Appointment_Date_Time": appointment.Appointment_Date_Time.strftime('%Y-%m-%d %H:%M:%S'),
+                "Appointment_End_Date_Time": appointment.Appointment_End_Date_Time.strftime('%Y-%m-%d %H:%M:%S'),
+                "Status": appointment.Status,
+                "Payment_ID": appointment.Payment_ID,
+                "Service_ID": appointment.Service_ID,
+                "Barber_User_ID": appointment.Barber_User_ID,
+                "Customer_User_ID": appointment.Customer_User_ID,
+                "F_Name": appointment.F_Name,
+                "L_Name": appointment.L_Name,
+                "Email": appointment.Email,
+                "Phone_Number": appointment.Phone_Number,
+                # Include any other fields you want here
+            }
+            appointments_list.append(appointment_data)
+            print('fetchweeklyappts', appointments_list)
 
-#         if not service:
-#             session.close()
-#             return jsonify(message="Service not found"), 404
-
-#         # Find users (barbers) who offer the service
-#         barbers = (
-#             User.query
-#             .filter(User.user_type.in_(['admin', 'barber']))
-#             .join(User.barber_services)
-#             .filter(Barber_Service.Service_ID == service_id)
-#             .all()
-#         )
-
-#         availability_data = []
-
-#         for barber in barbers:
-#             barber_data = {
-#                 'barber_id': barber.User_ID,
-#                 'barber_name': barber.name,
-#                 'availability': []
-#             }
-
-#             # Find available time slots for the barber on specific days (modify as needed)
-#             schedules = session.query(Schedule).filter_by(Barber_User_ID=barber.User_ID).all()
-#             for schedule in schedules:
-#                 availability_data.append({
-#                     'barber_id': barber.User_ID,
-#                     'barber_name': barber.name,
-#                     'day_of_week': schedule.Day_Of_Week,
-#                     'start_time': schedule.Start_Time.strftime('%H:%M'),
-#                     'end_time': schedule.End_Time.strftime('%H:%M'),
-#                 })
-
-#         # Close the session when done
-#         session.close()
-
-#         return jsonify(availability_data), 200
-
-#     except Exception as e:
-#         # Rollback the session in case of an error
-#         session.rollback()
-#         return jsonify(error=str(e)), 500
+        # Close the session
+        session.close()
+        # print(services_list)
+        # Return the list of service data as JSON
+        return jsonify({"appointments": appointments_list})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 
 
@@ -328,26 +352,26 @@ def get_available_dates_for_barber(barber_id):
 def get_available_time_slots_for_barber(barber_id):
     try:
         date_str = request.args.get('date')
-        print('date_str', date_str)
+        # print('date_str', date_str)
         # Create a session
         session = Session()
         
         # Format the date string to match the database format 'YYYY-MM-DD'
         formatted_date = datetime.strptime(date_str, '%a, %d %b %Y %H:%M:%S GMT').strftime('%Y-%m-%d')
-        print('formatted date', formatted_date)
+        # print('formatted date', formatted_date)
 
         # Calculate the start and end times for the selected day
         start_datetime = datetime.strptime(formatted_date, '%Y-%m-%d')
-        print('start_datetime', start_datetime)
+        # print('start_datetime', start_datetime)
         end_datetime = start_datetime + timedelta(days=1)
-        print('end_datetime', end_datetime)
+        # print('end_datetime', end_datetime)
         # Query the Schedule table to find available time slots for the selected barber on the selected date
         available_time_slots = session.query(Schedule).filter_by(
             Barber_User_ID=barber_id,
             Day_Of_Week=formatted_date,
             Status='Available'
         ).all()
-        print('available_time_slots', available_time_slots)
+        # print('available_time_slots', available_time_slots)
 
         # Extract the start and end times from the query result
         start_times = [slot.Start_Time for slot in available_time_slots]
@@ -363,7 +387,7 @@ def get_available_time_slots_for_barber(barber_id):
                 'start_time': start_time.strftime('%H:%M'),
                 'end_time': end_time.strftime('%H:%M')
             }
-        print('time_slots_dict', time_slots_dict)
+        # print('time_slots_dict', time_slots_dict)
 
         # Close the session
         session.close()
@@ -394,7 +418,7 @@ def create_booking():
     end_time_str = data.get('end_time')
     service = data.get('service_id')
     customer_id = data.get('customer_id')
-    print('customer_id', customer_id)
+    # print('customer_id', customer_id)
 
     # Convert date and times to the desired format
     date_obj = datetime.strptime(date_str, '%a, %d %b %Y %H:%M:%S %Z')
@@ -456,7 +480,7 @@ def create_booking():
 
         else:
             # Handle the case when the selected schedule is None, indicating an error
-            print('Selected schedule not found')
+            # print('Selected schedule not found')
             return jsonify({'error': 'Selected schedule not found'}), 400
 
         session.close()
@@ -481,12 +505,12 @@ def get_notifications(user_id):
 
         # Query the User table to find the user by User_ID
         user = session.query(User).filter_by(User_ID=user_id).first()
-        print('user', user)
+        # print('user', user)
 
         if user:
             # Query the Notification table to fetch notifications for the user
             notifications = session.query(Notification).filter_by(User_ID=user_id).all()
-            print('notifications', notifications)
+            # print('notifications', notifications)
             for notification in notifications:
                 print(notification.Notification_Date_Time.strftime('%Y-%m-%d %H:%M:%S'))
 
@@ -738,6 +762,50 @@ def get_appointments_for_barber(user_id):
 
 #     finally:
 #         session.close()
+
+
+# create a week of schedule records 
+@app.route('/create_schedule_records', methods=['POST'])
+def create_schedule_records():
+    session = Session()
+    try:
+        # Create a list of days of the week
+        days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+        #
+        # Query the User table to find all barbers
+        barbers = session.query(User).filter_by(User_Type='barber').all()
+
+        # Create a list of schedule records
+        schedule_records = []
+
+        # Iterate over the barbers and days of the week to create schedule records
+        for barber in barbers:
+            for day in days_of_week:
+                schedule_record = Schedule(
+                    Barber_User_ID=barber.User_ID,
+                    Day_Of_Week=day,
+                    Start_Time=datetime.strptime('09:00', '%H:%M'),
+                    End_Time=datetime.strptime('17:00', '%H:%M'),
+                    Status='Available'
+                )
+                schedule_records.append(schedule_record)
+
+        # Add the schedule records to the database
+        session.add_all(schedule_records)
+        session.commit()
+
+        return jsonify({'message': 'Schedule records created successfully'}), 201
+    
+    except Exception as e:
+        # Handle exceptions if any
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    
+    finally:
+        session.close()
+
+        
 
 
 
