@@ -7,13 +7,14 @@ from sqlalchemy.orm import sessionmaker
 from server.classes import User, Service, Barber_Service, Schedule, Appointment, Notification
 from flask_bcrypt import Bcrypt
 from datetime import datetime, timedelta
+from sqlalchemy import func
 
 
 app = Flask(__name__)
 
 
 # Configure CORS to allow requests from your frontend origin
-CORS(app, resources={r"/*": {"origins": "http://localhost:8080"}})
+CORS(app, resources={r"/*": {"origins": "http://localhost:8080"}}, methods=['GET', 'POST', 'PUT', 'DELETE'])
 
 
 
@@ -188,6 +189,46 @@ def get_all_services():
         return jsonify({"error": str(e)}), 500
     
 
+@app.route("/services/<int:user_id>", methods=["GET"])
+def get_services_for_barber(user_id):
+    try:
+        # Create a session instance
+        session = Session()
+
+        # Query the database to get all services offerd by the barber
+        services = (
+            session.query(Service)
+            .filter(Service.barber_services.any(Barber_Service.Barber_User_ID == user_id))
+            .all()
+        )
+
+        # Create a list to store the service data
+        services_list = []
+
+        # Iterate over the services and convert them to dictionaries
+        for service in services:
+
+            services_list.append({
+                "Service_ID": service.Service_ID,
+                "Service_Name": service.Service_Name,
+                "Service_Description": service.Service_Description,
+                "Service_Price": str(service.Service_Price),  # Convert to string for JSON
+                "Service_Duration": service.Service_Duration,
+                # Include any other fields you want here
+            })
+
+        # Close the session
+        session.close()
+        # print(services_list)
+        # Return the list of service data as JSON
+        return jsonify({"services": services_list})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+    
+
 @app.route('/updateservice/<int:service_id>', methods=['PUT'])
 def update_service(service_id):
     try:
@@ -332,11 +373,13 @@ def get_available_dates_for_barber(barber_id):
 
         # Extract distinct dates from the results
         distinct_dates = list(set(date[0] for date in available_dates))
-        print(distinct_dates)
+        sorted_distinct_dates = sorted(distinct_dates)
+        print(sorted_distinct_dates)
+
         # Close the session
         session.close()
 
-        return jsonify({'available_dates': distinct_dates})
+        return jsonify({'available_dates': sorted_distinct_dates})
 
     except Exception as e:
         # Close the session in case of an exception
@@ -640,16 +683,23 @@ def get_appointment_details(appointment_id):
         session.close()
 
 
-        
 
-@app.route('/appointmentsforbarber/<int:user_id>', methods=['GET'])
-def get_appointments_for_barber(user_id):
+@app.route('/dailyappointments/<int:user_id>/<string:date>', methods=['GET'])
+def get_appointments_for_barber_by_date(user_id, date):
     try:
         session = Session()
+        
+        print('user_id', user_id)
+        print('date', date)
 
-        # Query the Appointment table to find appointments for the user
-        appointments = session.query(Appointment).filter_by(Barber_User_ID=user_id).all()
-        print('appointments', appointments)
+        # Convert the 'date' string to a date object
+        date_obj = datetime.strptime(date, '%Y-%m-%d').date()
+
+        # Query the Appointment table to find appointments for the user and date
+        appointments = session.query(Appointment).filter(
+            Appointment.Barber_User_ID == user_id,
+            func.date(Appointment.Appointment_Date_Time) == date_obj
+        ).all()
 
         # Convert appointments to a list of dictionaries with desired fields
         formatted_appointments = []
@@ -668,7 +718,6 @@ def get_appointments_for_barber(user_id):
                 'last_name': None,
                 'phone_number': None
             }
-            print('customerdetails\n', customer_details)
 
             # Check if customer_user_id is not None and retrieve customer details if available
             if appointment.Customer_User_ID:
@@ -683,7 +732,6 @@ def get_appointments_for_barber(user_id):
                 customer_details['first_name'] = appointment.F_Name
                 customer_details['last_name'] = appointment.L_Name
                 customer_details['phone_number'] = appointment.Phone_Number
-            
 
             if service and schedule:
                 formatted_appointment = {
@@ -703,9 +751,80 @@ def get_appointments_for_barber(user_id):
                     'end_time': schedule.End_Time.strftime('%H:%M:%S')
                 }
                 formatted_appointments.append(formatted_appointment)
-                print(formatted_appointments)
 
         return jsonify({'appointments': formatted_appointments}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+from flask import request
+
+@app.route('/services/<int:service_id>/<int:user_id>', methods=['DELETE'])
+def delete_service(service_id, user_id):
+    try:
+        session = Session()
+        
+        # Check if the user making the request is an 'admin' or a 'barber'
+        user = session.query(User).filter_by(User_ID=user_id).first()
+        print('user', user)
+        print('user.User_Type', user.User_Type)
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+        
+        if user.User_Type == 'admin':
+            # Admin user, perform hard delete of the service
+            service = session.query(Service).filter_by(Service_ID=service_id).first()
+            print('service', service.Service_ID)
+
+            if service:
+                # Delete the service
+                session.delete(service)
+                session.commit()
+                return jsonify({'message': 'Service deleted successfully'}), 200
+            else:
+                return jsonify({'message': 'Service not found'}), 404
+        elif user.User_Type == 'barber':
+            # Barber user, delete records from Barber_Service table
+            session.query(Barber_Service).filter_by(Barber_User_ID=user_id, Service_ID=service_id).delete()
+            session.commit()
+            return jsonify({'message': 'Barber disconnected from the service'}), 200
+        else:
+            # Handle other user roles as needed
+            return jsonify({'message': 'User role not supported for service deletion'}), 403
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/addservice', methods=['POST'])
+def add_service():
+    try:
+        data = request.get_json()
+        service_name = data.get('Service_Name')
+        service_description = data.get('Service_Description')
+        service_price = data.get('Service_Price')
+        service_duration = data.get('Service_Duration')
+
+        session = Session()
+
+        # Create a new service record
+        new_service = Service(
+            Service_Name=service_name,
+            Service_Description=service_description,
+            Service_Price=service_price,
+            Service_Duration=service_duration
+        )
+
+        # Add the service to the database
+        session.add(new_service)
+        session.commit()
+
+        return jsonify({'message': 'Service added successfully'}), 201
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -798,12 +917,17 @@ def create_schedule_records():
         return jsonify({'message': 'Schedule records created successfully'}), 201
     
     except Exception as e:
+        print('Error', str(e))
         # Handle exceptions if any
         session.rollback()
         return jsonify({'error': str(e)}), 500
+
     
     finally:
         session.close()
+
+
+
 
         
 
