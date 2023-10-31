@@ -86,11 +86,20 @@ class Payment(Base):
     __tablename__ = 'Payment'
 
     Payment_ID = Column(Integer, primary_key=True, autoincrement=True)
-    Payment_Type = Column(String(25), nullable=False)
+    Payment_Type_ID = Column(Integer, ForeignKey('Payment_Type.Payment_Type_ID'), nullable=False)
     Payment_Amount = Column(Numeric(scale=2, precision=10), nullable=True)
     Payment_Date = Column(DateTime, nullable=False)
 
     appointments = relationship('Appointment', backref='payment')
+
+
+class Payment_Type(Base):
+    __tablename__ = 'Payment_Type'
+
+    Payment_Type_ID = Column(Integer, primary_key=True, autoincrement=True)
+    Payment_Type_Name = Column(String(20), nullable=False)
+
+
 
 
 class Review(Base):

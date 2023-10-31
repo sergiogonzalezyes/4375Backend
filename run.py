@@ -4,10 +4,11 @@ import os
 from dotenv import load_dotenv
 from server.db import engine
 from sqlalchemy.orm import sessionmaker
-from server.classes import User, Service, Barber_Service, Schedule, Appointment, Notification
+from server.classes import User, Service, Barber_Service, Schedule, Appointment, Notification, Payment, Payment_Type
 from flask_bcrypt import Bcrypt
 from datetime import datetime, timedelta
 from sqlalchemy import func
+import smtplib
 
 
 app = Flask(__name__)
@@ -519,12 +520,67 @@ def create_booking():
             # Update the schedule status
             selected_schedule.Status = 'Unavailable'
 
+
+            # Get service data 
+            service_booked = session.query(Service).filter_by(Service_ID=service).first()
+            service_name = service_booked.Service_Name
+
+
             session.commit()  # Commit the notification and schedule changes
 
         else:
             # Handle the case when the selected schedule is None, indicating an error
             # print('Selected schedule not found')
             return jsonify({'error': 'Selected schedule not found'}), 400
+        
+
+        # Query barber/admin's email by barber_id
+        barber = session.query(User).filter_by(User_ID=barber_id).first()
+        if barber:
+            barber_email = barber.Email
+
+            # Use Outlook.com's SMTP server
+            smtp_server = 'smtp-mail.outlook.com'
+            smtp_port = 587
+
+            # Now send email to customer and barber that appointment was booked with relevant information of appointment
+            # Email to customer
+            sender_email = os.getenv('EMAIL_ADDRESS')
+            sender_password = os.getenv('EMAIL_PASSWORD')
+            receiver_email = email
+
+            message = f"""\
+            Subject: Appointment Confirmation
+
+            Dear {first_name} {last_name},
+            Your appointment has been booked with {barber.F_Name} on {date_formatted} at {start_time_formatted} for {service_name}.
+            """
+            try:
+                with smtplib.SMTP(smtp_server, smtp_port) as smtp:
+                    smtp.starttls()
+                    smtp.login(sender_email, sender_password)
+                    smtp.sendmail(sender_email, receiver_email, message)
+
+                # Email to barber/admin
+                message = f"""\
+                Subject: New Appointment Scheduled
+
+                Dear {barber.F_Name},
+                A new appointment has been scheduled by {first_name} {last_name} on {date_formatted} at {start_time_formatted} for {service_name}.
+                """
+                with smtplib.SMTP(smtp_server, smtp_port) as smtp:
+                    smtp.starttls()
+                    smtp.login(sender_email, sender_password)
+                    smtp.sendmail(sender_email, barber_email, message)
+
+            except Exception as e:
+                print('Error:', str(e))
+                return jsonify({'error': str(e)}), 500
+        else:
+            return jsonify({'error': 'Barber not found'}), 404
+        
+
+
 
         session.close()
 
@@ -829,6 +885,33 @@ def add_service():
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
+
+
+@app.route('/payment-methods', methods=['GET'])
+def get_payment_methods():
+
+    try:
+        session = Session()
+
+        # Query the Payment_Method table to get all payment methods
+        payment_methods = session.query(Payment_Type).all()
+
+        # Convert payment methods to a list of dictionaries with desired fields
+        formatted_payment_methods = []
+        for payment_method in payment_methods:
+            formatted_payment_method = {
+                'id': payment_method.Payment_ID,
+                'name': payment_method.Payment_Type_Name,
+            }
+            formatted_payment_methods.append(formatted_payment_method)
+
+        return jsonify({'payment_methods': formatted_payment_methods}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
 
 
 
