@@ -101,7 +101,6 @@ class Payment_Type(Base):
 
 
 
-
 class Review(Base):
     __tablename__ = 'Review'
 

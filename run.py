@@ -887,30 +887,31 @@ def add_service():
         session.close()
 
 
-@app.route('/payment-methods', methods=['GET'])
-def get_payment_methods():
+# @app.route('/payment-methods', methods=['GET'])
+# def get_payment_methods():
 
-    try:
-        session = Session()
+#     try:
+#         session = Session()
 
-        # Query the Payment_Method table to get all payment methods
-        payment_methods = session.query(Payment_Type).all()
+#         # Query the Payment_Method table to get all payment methods
+#         payment_methods = session.query(Payment_Type).all()
+#         print()
 
-        # Convert payment methods to a list of dictionaries with desired fields
-        formatted_payment_methods = []
-        for payment_method in payment_methods:
-            formatted_payment_method = {
-                'id': payment_method.Payment_ID,
-                'name': payment_method.Payment_Type_Name,
-            }
-            formatted_payment_methods.append(formatted_payment_method)
+#         # Convert payment methods to a list of dictionaries with desired fields
+#         formatted_payment_methods = []
+#         for payment_method in payment_methods:
+#             formatted_payment_method = {
+#                 'id': payment_method.Payment_ID,
+#                 'name': payment_method.Payment_Type_Name,
+#             }
+#             formatted_payment_methods.append(formatted_payment_method)
 
-        return jsonify({'payment_methods': formatted_payment_methods}), 200
+#         return jsonify({'payment_methods': formatted_payment_methods}), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        session.close()
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
+#     finally:
+#         session.close()
 
 
 
@@ -966,48 +967,48 @@ def get_payment_methods():
 #         session.close()
 
 
-# create a week of schedule records 
-@app.route('/create_schedule_records', methods=['POST'])
-def create_schedule_records():
-    session = Session()
-    try:
-        # Create a list of days of the week
-        days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+# # create a week of schedule records 
+# @app.route('/create_schedule_records', methods=['POST'])
+# def create_schedule_records():
+#     session = Session()
+#     try:
+#         # Create a list of days of the week
+#         days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-        #
-        # Query the User table to find all barbers
-        barbers = session.query(User).filter_by(User_Type='barber').all()
+#         #
+#         # Query the User table to find all barbers
+#         barbers = session.query(User).filter_by(User_Type='barber').all()
 
-        # Create a list of schedule records
-        schedule_records = []
+#         # Create a list of schedule records
+#         schedule_records = []
 
-        # Iterate over the barbers and days of the week to create schedule records
-        for barber in barbers:
-            for day in days_of_week:
-                schedule_record = Schedule(
-                    Barber_User_ID=barber.User_ID,
-                    Day_Of_Week=day,
-                    Start_Time=datetime.strptime('09:00', '%H:%M'),
-                    End_Time=datetime.strptime('17:00', '%H:%M'),
-                    Status='Available'
-                )
-                schedule_records.append(schedule_record)
+#         # Iterate over the barbers and days of the week to create schedule records
+#         for barber in barbers:
+#             for day in days_of_week:
+#                 schedule_record = Schedule(
+#                     Barber_User_ID=barber.User_ID,
+#                     Day_Of_Week=day,
+#                     Start_Time=datetime.strptime('09:00', '%H:%M'),
+#                     End_Time=datetime.strptime('17:00', '%H:%M'),
+#                     Status='Available'
+#                 )
+#                 schedule_records.append(schedule_record)
 
-        # Add the schedule records to the database
-        session.add_all(schedule_records)
-        session.commit()
+#         # Add the schedule records to the database
+#         session.add_all(schedule_records)
+#         session.commit()
 
-        return jsonify({'message': 'Schedule records created successfully'}), 201
+#         return jsonify({'message': 'Schedule records created successfully'}), 201
     
-    except Exception as e:
-        print('Error', str(e))
-        # Handle exceptions if any
-        session.rollback()
-        return jsonify({'error': str(e)}), 500
+#     except Exception as e:
+#         print('Error', str(e))
+#         # Handle exceptions if any
+#         session.rollback()
+#         return jsonify({'error': str(e)}), 500
 
     
-    finally:
-        session.close()
+    # finally:
+    #     session.close()
 
 
 
