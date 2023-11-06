@@ -1140,6 +1140,89 @@ def get_available_time_slots(user_id, date):
 
 
 
+@app.route('/unavailabletimeslots/<int:user_id>/<string:date>', methods=['GET'])
+def get_unavailable_time_slots(user_id, date):
+    try:
+        session = Session()
+
+        # Query the Schedule table to find unavailable time slots for the selected barber
+        unavailable_time_slots = session.query(Schedule).filter_by(Barber_User_ID=user_id, Status='Unavailable', Day_Of_Week=date).all()
+
+        # Create a dictionary with auto-incremented slot numbers
+        time_slots_dict = {}
+        for index, slot in enumerate(unavailable_time_slots, start=1):
+            time_slots_dict[index] = {
+                'start_time': slot.Start_Time.strftime('%H:%M'),
+                'end_time': slot.End_Time.strftime('%H:%M'),
+                'status': slot.Status
+            }
+        print('time_slots_dict', time_slots_dict)
+
+        # Close the session
+        session.close()
+
+        # Return the time_slots_dict as JSON
+        return jsonify({'unavailable_time_slots': time_slots_dict})
+
+    except Exception as e:
+        # Close the session in case of an exception
+        if 'session' in locals():
+            session.close()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+
+@app.route('/addBlock/<int:user_id>/<string:date>', methods=['PUT'])
+def add_block(user_id, date):
+    try:
+        session = Session()
+
+        data = request.get_json()
+        # print('data', data)
+
+        # Iterate through the list of objects in data
+        for item in data:
+            start_time = item.get('start_time')
+            print('start_time', start_time)
+            end_time = item.get('end_time')
+            print('end_time', end_time)
+            new_status = 'Unavailable'  # Set the new status to 'Unavailable'
+            print('date', date)
+            start_time_formatted = f"{date} {start_time}:00"
+            print('start_time_formatted', start_time_formatted)
+            end_time_formatted = f"{date} {end_time}:00"
+            print('end_time_formatted', end_time_formatted)
+
+            # Query the database for the existing Schedule record
+            existing_schedule = session.query(Schedule).filter(
+                Schedule.Barber_User_ID == user_id,
+                Schedule.Day_Of_Week == date,
+                Schedule.Start_Time == start_time_formatted,
+                Schedule.End_Time == end_time_formatted,
+                Schedule.Status == 'Available'
+            ).first()
+
+            print('existing_schedule', existing_schedule)
+
+            if existing_schedule:
+                # Update the status of the existing record
+                existing_schedule.Status = new_status
+
+        session.commit()
+        return jsonify({'message': 'Schedules updated successfully'}), 200
+
+    except Exception as e:
+        session.rollback()  # Roll back changes in case of an error
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+
+
+
 
 # @app.route('/payment-methods', methods=['GET'])
 # def get_payment_methods():
