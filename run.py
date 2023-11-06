@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from server.db import engine
 from sqlalchemy.orm import sessionmaker
-from server.classes import User, Service, Barber_Service, Schedule, Appointment, Notification, Payment, Payment_Type
+from server.classes import User, Service, Barber_Service, Schedule, Appointment, Notification, Payment_Type
 from flask_bcrypt import Bcrypt
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, or_
@@ -455,6 +455,33 @@ def get_available_time_slots_for_barber(barber_id):
     
 
 
+@app.route('/payment-methods', methods=['GET'])
+def get_payment_methods():
+    try:
+        session = Session()
+
+        # Query the Payment_Method table to get all payment methods
+        payment_methods = session.query(Payment_Type).all()
+        print(payment_methods)
+
+        # Convert payment methods to a list of dictionaries with desired fields
+        formatted_payment_methods = []
+        for payment_method in payment_methods:
+            formatted_payment_method = {
+                'id': payment_method.Payment_Type_ID,
+                'name': payment_method.Payment_Type_Name,
+            }
+            formatted_payment_methods.append(formatted_payment_method)
+
+        return jsonify({'payment_methods': formatted_payment_methods}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+    
+
+
 @app.route('/bookings', methods=['POST'])
 def create_booking():
     # Get data from the request's JSON body
@@ -471,6 +498,7 @@ def create_booking():
     end_time_str = data.get('end_time')
     service = data.get('service_id')
     customer_id = data.get('customer_id')
+    payment_method_id = data.get('payment_method')
     # print('customer_id', customer_id)
 
     # Convert date and times to the desired format
@@ -507,7 +535,8 @@ def create_booking():
                 Appointment_End_Date_Time=end_datetime,
                 Status='Confirmed',  # Set an appropriate status
                 Service_ID=service,
-                Schedule_ID=selected_schedule.Schedule_ID  # Assign the Schedule_ID from the selected schedule
+                Schedule_ID=selected_schedule.Schedule_ID,  # Assign the Schedule_ID from the selected schedule
+                Payment_Type_ID=payment_method_id
             )
 
             session.add(appointment)

@@ -49,7 +49,7 @@ class Appointment(Base):
     Appointment_Date_Time = Column(DateTime, nullable=False)
     Appointment_End_Date_Time = Column(DateTime, nullable=False)
     Status = Column(String(10), nullable=False)
-    Payment_ID = Column(Integer, ForeignKey('Payment.Payment_ID'))
+    Payment_Type_ID = Column(Integer, ForeignKey('Payment_Type.Payment_Type_ID'))
     Service_ID = Column(Integer, ForeignKey('Service.Service_ID'))
     Schedule_ID = Column(Integer, ForeignKey('Schedule.Schedule_ID'))
 
@@ -57,6 +57,7 @@ class Appointment(Base):
     notifications = relationship('Notification', backref='appointment')
     customer_histories = relationship('Customer_History', backref='appointment')
     appointment_schedule = relationship('Schedule', backref='appointment')
+    payment_type = relationship('Payment_Type', backref='appointment')
 
 
 
@@ -80,17 +81,6 @@ class Notification(Base):
     Notification_Type = Column(String(15), nullable=False)
     Notification_Date_Time = Column(DateTime, nullable=False)
     Notification_Status = Column(String(15), nullable=False)
-
-
-class Payment(Base):
-    __tablename__ = 'Payment'
-
-    Payment_ID = Column(Integer, primary_key=True, autoincrement=True)
-    Payment_Type_ID = Column(Integer, ForeignKey('Payment_Type.Payment_Type_ID'), nullable=False)
-    Payment_Amount = Column(Numeric(scale=2, precision=10), nullable=True)
-    Payment_Date = Column(DateTime, nullable=False)
-
-    appointments = relationship('Appointment', backref='payment')
 
 
 class Payment_Type(Base):
@@ -151,12 +141,12 @@ class Barber_Service(Base):
     service = relationship('Service', backref='barber_services')
 
 
-# create a function that pulls from the user table
-def get_user(username):
-    from sqlalchemy.orm import sessionmaker
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    user = session.query(User).filter_by(Username=username).first()
-    return user
+# # create a function that pulls from the user table
+# def get_user(username):
+#     from sqlalchemy.orm import sessionmaker
+#     Session = sessionmaker(bind=engine)
+#     session = Session()
+#     user = session.query(User).filter_by(Username=username).first()
+#     return user
 
 
