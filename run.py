@@ -802,6 +802,9 @@ def get_appointments_for_barber_by_date(user_id, date):
             # Get the schedule information associated with the appointment
             schedule = session.query(Schedule).filter_by(Schedule_ID=appointment.Schedule_ID).first()
 
+            payment_method = session.query(Payment_Type).filter_by(Payment_Type_ID=appointment.Payment_Type_ID).first()
+            # print('payment_method', payment_method.Payment_Type_Name)
+
             # Initialize customer details
             customer_details = {
                 'customer_user_id': appointment.Customer_User_ID,
@@ -840,9 +843,11 @@ def get_appointments_for_barber_by_date(user_id, date):
                         'service_duration': service.Service_Duration
                     },
                     'start_time': schedule.Start_Time.strftime('%H:%M:%S'),
-                    'end_time': schedule.End_Time.strftime('%H:%M:%S')
+                    'end_time': schedule.End_Time.strftime('%H:%M:%S'),
+                    'payment_method': payment_method.Payment_Type_Name
                 }
                 formatted_appointments.append(formatted_appointment)
+                print('formatted_appointments', formatted_appointments)
 
         return jsonify({'appointments': formatted_appointments}), 200
     except Exception as e:
