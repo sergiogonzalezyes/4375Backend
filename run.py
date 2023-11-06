@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from server.classes import User, Service, Barber_Service, Schedule, Appointment, Notification, Payment, Payment_Type
 from flask_bcrypt import Bcrypt
 from datetime import datetime, timedelta
-from sqlalchemy import func
+from sqlalchemy import func, and_, or_
 import smtplib
 
 
@@ -199,7 +199,9 @@ def get_services_for_barber(user_id):
         # Query the database to get all services offerd by the barber
         services = (
             session.query(Service)
-            .filter(Service.barber_services.any(Barber_Service.Barber_User_ID == user_id))
+            .filter(Service.barber_services.any(
+                and_(Barber_Service.Barber_User_ID == user_id, Barber_Service.Status == 'Enabled')
+            ))
             .all()
         )
 
@@ -217,6 +219,8 @@ def get_services_for_barber(user_id):
                 "Service_Duration": service.Service_Duration,
                 # Include any other fields you want here
             })
+
+        print(services_list)
 
         # Close the session
         session.close()
@@ -307,6 +311,11 @@ def fetchWeeklyAppointments(user_id):
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()
+
+
+
+
+
 
 
 
@@ -817,22 +826,59 @@ def get_appointments_for_barber_by_date(user_id, date):
 
 from flask import request
 
+# @app.route('/services/<int:service_id>/<int:user_id>', methods=['DELETE'])
+# def delete_service(service_id, user_id):
+#     try:
+#         session = Session()
+        
+#         # Check if the user making the request is an 'admin' or a 'barber'
+#         user = session.query(User).filter_by(User_ID=user_id).first()
+#         print('user', user)
+#         print('user.User_Type', user.User_Type)
+#         if not user:
+#             return jsonify({'message': 'User not found'}), 404
+        
+#         if user.User_Type == 'admin':
+#             # Admin user, perform hard delete of the service
+#             service = session.query(Service).filter_by(Service_ID=service_id).first()
+#             print('service', service.Service_ID)
+
+#             if service:
+#                 # Delete the service
+#                 session.delete(service)
+#                 session.commit()
+#                 return jsonify({'message': 'Service deleted successfully'}), 200
+#             else:
+#                 return jsonify({'message': 'Service not found'}), 404
+#         elif user.User_Type == 'barber':
+#             # Barber user, delete records from Barber_Service table
+#             session.query(Barber_Service).filter_by(Barber_User_ID=user_id, Service_ID=service_id).delete()
+#             session.commit()
+#             return jsonify({'message': 'Barber disconnected from the service'}), 200
+#         else:
+#             # Handle other user roles as needed
+#             return jsonify({'message': 'User role not supported for service deletion'}), 403
+
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
+#     finally:
+#         session.close()
+
+
 @app.route('/services/<int:service_id>/<int:user_id>', methods=['DELETE'])
 def delete_service(service_id, user_id):
     try:
         session = Session()
         
-        # Check if the user making the request is an 'admin' or a 'barber'
+        # Check if the user making the request is an 'admin'
         user = session.query(User).filter_by(User_ID=user_id).first()
-        print('user', user)
-        print('user.User_Type', user.User_Type)
+        
         if not user:
             return jsonify({'message': 'User not found'}), 404
         
         if user.User_Type == 'admin':
             # Admin user, perform hard delete of the service
             service = session.query(Service).filter_by(Service_ID=service_id).first()
-            print('service', service.Service_ID)
 
             if service:
                 # Delete the service
@@ -841,11 +887,6 @@ def delete_service(service_id, user_id):
                 return jsonify({'message': 'Service deleted successfully'}), 200
             else:
                 return jsonify({'message': 'Service not found'}), 404
-        elif user.User_Type == 'barber':
-            # Barber user, delete records from Barber_Service table
-            session.query(Barber_Service).filter_by(Barber_User_ID=user_id, Service_ID=service_id).delete()
-            session.commit()
-            return jsonify({'message': 'Barber disconnected from the service'}), 200
         else:
             # Handle other user roles as needed
             return jsonify({'message': 'User role not supported for service deletion'}), 403
@@ -854,6 +895,7 @@ def delete_service(service_id, user_id):
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
+
 
 
 @app.route('/addservice', methods=['POST'])
@@ -885,6 +927,44 @@ def add_service():
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
+
+
+
+@app.route('/services/disable/<int:service_id>/<int:user_id>', methods=['PUT'])
+def disable_service(service_id, user_id):
+    try:
+        session = Session()
+
+        # Check if the user making the request is the owner of the service
+        barber_service = (
+            session.query(Barber_Service)
+            .filter_by(Barber_User_ID=user_id, Service_ID=service_id, Status='Enabled')
+            .first()
+        )
+
+        if not barber_service:
+            return jsonify({'message': 'Service not found or already disabled'}), 404
+
+        # Update the 'Status' to 'Disabled'
+        barber_service.Status = 'Disabled'
+        session.commit()
+
+        # Close the session
+        session.close()
+
+        return jsonify({'message': 'Service disabled successfully'}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+
+
+
+
+
 
 
 # @app.route('/payment-methods', methods=['GET'])

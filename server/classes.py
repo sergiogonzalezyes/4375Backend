@@ -143,7 +143,8 @@ class Barber_Service(Base):
 
     Barber_Service_ID = Column(Integer, primary_key=True, autoincrement=True)
     Barber_User_ID = Column(Integer, ForeignKey('User.User_ID'), nullable=False)
-    Service_ID = Column(Integer, ForeignKey('Service.Service_ID'), nullable=False)
+    Service_ID = Column(Integer, ForeignKey('Service.Service_ID'), nullable=True)
+    Status = Column(String(10), nullable=False)
 
     # Add relationships
     barber = relationship('User', backref='barber_services')
