@@ -1101,6 +1101,39 @@ def update_barber_service(user_id, service_id):
         session.close()
 
 
+@app.route('/availabletimeslots/<int:user_id>/<string:date>', methods=['GET'])
+def get_available_time_slots(user_id, date):
+    try:
+        session = Session()
+
+        # Query the Schedule table to find available time slots for the selected barber
+        available_time_slots = session.query(Schedule).filter_by(Barber_User_ID=user_id, Status='Available', Day_Of_Week=date).all()
+
+        # Create a dictionary with auto-incremented slot numbers
+        time_slots_dict = {}
+        for index, slot in enumerate(available_time_slots, start=1):
+            time_slots_dict[index] = {
+                'start_time': slot.Start_Time.strftime('%H:%M'),
+                'end_time': slot.End_Time.strftime('%H:%M'),
+                'status': slot.Status
+            }
+        print('time_slots_dict', time_slots_dict)
+
+        # Close the session
+        session.close()
+
+        # Return the time_slots_dict as JSON
+        return jsonify({'available_time_slots': time_slots_dict})
+
+    except Exception as e:
+        # Close the session in case of an exception
+        if 'session' in locals():
+            session.close()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
 
 
 # @app.route('/payment-methods', methods=['GET'])
