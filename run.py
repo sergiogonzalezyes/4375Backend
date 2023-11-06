@@ -317,8 +317,6 @@ def fetchWeeklyAppointments(user_id):
 
 
 
-
-
 @app.route('/service/<int:service_id>/availability', methods=['GET'])
 def get_service_availability(service_id):
     try:
@@ -948,6 +946,20 @@ def add_service():
 
         # Add the service to the database
         session.add(new_service)
+
+        # Add the service to the Barber_Service table for all barbers / admin users
+        barbers = session.query(User).filter(User.User_Type.in_(['admin', 'barber'])).all()
+
+        for barber in barbers:
+            barber_service = Barber_Service(
+                Barber_User_ID=barber.User_ID,
+                Service_ID=new_service.Service_ID,
+                Status='Disabled'
+            )
+            session.add(barber_service)
+
+
+
         session.commit()
 
         return jsonify({'message': 'Service added successfully'}), 201
@@ -989,9 +1001,104 @@ def disable_service(service_id, user_id):
         session.close()
 
 
+from flask import jsonify
+
+@app.route('/barber_crud', methods=['GET'])
+def get_all_barbers_services():
+    try:
+        session = Session()
+
+        # Query the User table to find all 'admin'/'barber' users
+        barbers = session.query(User).filter(User.User_Type.in_(['admin', 'barber'])).all()
+
+        # Create a dictionary to store the barber data
+        barbers_dict = {}
+
+        # Iterate over the barbers and convert them to dictionaries
+        for barber in barbers:
+            # Query the Barber_Service table to find all services offered by the barber
+# Modify the query to include the Status attribute from the Barber_Service table
+            services = (
+                session.query(Service, Barber_Service.Status)
+                .join(Barber_Service, and_(
+                    Service.Service_ID == Barber_Service.Service_ID,
+                    Barber_Service.Barber_User_ID == barber.User_ID
+                ))
+                .all()
+            )
+
+            # Create a list to store the service data
+            services_list = []
+
+            # Iterate over the services and convert them to dictionaries
+            for service, status in services:
+                service_data = {
+                    "Service_ID": service.Service_ID,
+                    "Service_Name": service.Service_Name,
+                    "Service_Description": service.Service_Description,
+                    "Service_Price": str(service.Service_Price),  # Convert to string for JSON
+                    "Service_Duration": service.Service_Duration,
+                    "Status": status  # Include the Status attribute
+                    # Include any other fields you want here
+                }
+                services_list.append(service_data)
 
 
+            barber_data = {
+                "User_ID": barber.User_ID,
+                "F_Name": barber.F_Name,
+                "L_Name": barber.L_Name,
+                "Email": barber.Email,
+                "Phone_Number": barber.Phone_Number,
+                "Services": services_list
+            }
+            print(barber_data)
 
+            # Add the barber data to the dictionary with the barber ID as the key
+            barbers_dict[barber.User_ID] = barber_data
+
+        # Close the session
+        session.close()
+
+        # Return the dictionary of barber data as JSON
+        return jsonify(barbers_dict)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/barber_crud/<int:user_id>/services/<int:service_id>', methods=['PUT'])
+def update_barber_service(user_id, service_id):
+    # Get JSON data from the request
+    data = request.get_json()
+    print('data', data)
+
+    try:
+        session = Session()
+
+        # Query the Barber_Service table to find the record for the barber and service
+        barber_service = session.query(Barber_Service).filter_by(Barber_User_ID=user_id, Service_ID=service_id).first()
+
+        if barber_service:
+            # Toggle the Status attribute (assuming 'Enabled' becomes 'Disabled' and vice versa)
+            if barber_service.Status == 'Enabled':
+                barber_service.Status = 'Disabled'
+            else:
+                barber_service.Status = 'Enabled'
+
+            session.commit()
+
+            # Return a JSON response with the updated status
+            response_data = {'message': 'Service status updated successfully', 'status': barber_service.Status}
+            return jsonify(response_data), 200
+        else:
+            return jsonify({'message': 'Service not found'}), 404
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
 
 
 
