@@ -24,13 +24,25 @@ Before you begin, make sure you have the following installed:
    ```bash
    git clone https://github.com/yourusername/your-backend-repo.git
 
-2. cd your-backend-repo
+2. Navigate to the backend project directory:
+   ```
+   cd your-backend-repo
 
-3. virtualenv venv
+3. Create a virtual environment:
+   ```
+   virtualenv venv
 
-4. source venv/bin/activate
-or if on windows: source venv/Scripts/activate
+4. Activate the virtual environment Mac:
+   ```
+   source venv/bin/activate
+5. Activate the virtual environment Windows: 
+   ```
+   source venv/Scripts/activate
 
-5. pip install -r requirements.txt
+6. Install the project dependencies from requirements.txt:
+   ```
+   pip install -r requirements.txt
 
-6. flask run
+6. To run the Flask backend, use the following command:
+   ```
+   flask run
