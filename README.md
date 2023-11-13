@@ -15,8 +15,8 @@ These instructions will help you set up and run your Flask Python backend.
 Before you begin, make sure you have the following installed:
 
 - Python 3.x (with pip)
-- [Virtualenv](https://pypi.org/project/virtualenv/) (optional but recommended)
-
+- [Virtualenv](https://pypi.org/project/virtualenv/)
+- 
 ### Installation
 
 1. Clone the backend repository:
@@ -24,13 +24,13 @@ Before you begin, make sure you have the following installed:
    ```bash
    git clone https://github.com/yourusername/your-backend-repo.git
 
-cd your-backend-repo
+2. cd your-backend-repo
 
-virtualenv venv
+3. virtualenv venv
 
-source venv/bin/activate
+4. source venv/bin/activate
 or if on windows: source venv/Scripts/activate
 
-pip install -r requirements.txt
+5. pip install -r requirements.txt
 
-flask run
+6. flask run
