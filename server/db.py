@@ -9,7 +9,7 @@ load_dotenv()
 
 # Get the database URL from the environment variables
 database_url = os.getenv("DATABASE_URL")
-print('LOOK HERE', database_url)
+# print('LOOK HERE', database_url)
 
 if database_url is None:
     raise ValueError("DATABASE_URL environment variable is not set")
